@@ -4,7 +4,7 @@ from matplotlib.ticker import MaxNLocator
 
 
 base_dir = "./results/"
-methods = ["SEA_FFA", "SEA_FF", "SEA_RRA", "SEA_RR", "AdGDA_RR", "SEA_US", "AdGDA_US"]
+methods = ["SEA_FFA", "SEA_FF", "SEA_RRA", "SEA_RR", "SEA_US", "AdGDA_RR", "AdGDA_US"]
 plt_data = []
 for method in methods :
     results = np.load(base_dir + "cifar_" + method + "_losses.npy")
