@@ -21,8 +21,9 @@ FF_grad_norm_trace = np.zeros((runs, rec+1))
 RRA_grad_norm_trace = np.zeros((runs, rec+1))
 RRA2_grad_norm_trace = np.zeros((runs, rec+1))
 RR_grad_norm_trace = np.zeros((runs, rec+1))
-SlGDA_grad_norm_trace = np.zeros((runs, rec+1)) 
-SlGDA2_grad_norm_trace = np.zeros((runs, rec+1)) 
+USA_grad_norm_trace = np.zeros((runs, rec+1))
+USA2_grad_norm_trace = np.zeros((runs, rec+1))
+SEG_grad_norm_trace = np.zeros((runs, rec+1)) 
 
 init_norm_sq = np.zeros((runs, 1))
 
@@ -164,82 +165,88 @@ for r in trange(runs, leave=True):
         if (k+1) % skip == 0 :
             RR_grad_norm_trace[r, (k+1)//skip] = np.linalg.norm(Q @ z - t) ** 2 
     
-    ## Slingshot GDA
-    TT11 = np.diag(np.concat(np.ones(dx), -np.ones(dy)))
-    TT12 = np.diag(np.concat(np.zeros(dx), np.ones(dy)))
-    TT21 = np.diag(np.concat(-np.ones(dx), np.ones(dy)))
-    TT22 = np.diag(np.concat(np.ones(dx), np.zeros(dy)))
-
+    ## SEG-USA
     z = np.copy(z0)
-    SlGDA_grad_norm_trace[r, 0] = np.linalg.norm(Q @ z0 - t)**2
+    USA_grad_norm_trace[r, 0] = np.linalg.norm(Q @ z0 - t)**2
 
     for k in tqdm(range(K), leave=False):
         for _ in range(2):
             tau = rng.choice(n, n, replace=True)
-            eta_k = eta_0 / (1. + k / 10.0)**decay_exp 
-
-            coinflip = rng.integers(2)
+            eta_k = eta_0 / (1. + k / 10.0)**decay_exp
+            z_anch = np.copy(z)
+            for i in range(n):
+                w = z - eta_k * F_hat(z, tau[i]) 
+                z = z - eta_k * F_hat(w, tau[i])
             
-            if coinflip > .5 : 
-                for i in range(n):
-                    z = z - eta_k * TT11 @ F_hat(z, tau[i]) 
-                    z = z - eta_k * TT12 @ F_hat(z, tau[i])  
-            else :
-                for i in range(n):
-                    z = z - eta_k * TT21 @ F_hat(z, tau[i]) 
-                    z = z - eta_k * TT22 @ F_hat(z, tau[i])   
+                z = 0.5 * (z + z_anch)
 
         if (k+1) % skip == 0 :
-            SlGDA_grad_norm_trace[r, (k+1)//skip] = np.linalg.norm(Q@z - t) ** 2
+            USA_grad_norm_trace[r, (k+1)//skip] = np.linalg.norm(Q@z - t) ** 2
 
     ## SEG-USA2
     z = np.copy(z0)
-    SlGDA2_grad_norm_trace[r, 0] = np.linalg.norm(Q @ z0 - t)**2
+    USA2_grad_norm_trace[r, 0] = np.linalg.norm(Q @ z0 - t)**2
+
+    for k in tqdm(range(K), leave=False):
+        for _ in range(2):
+            tau = rng.choice(n, n, replace=True)
+            eta_k = eta_0 / (1. + k / 10.0)**decay_exp
+            z_anch = np.copy(z)
+            for i in range(n):
+                w = z - eta_k/2 * F_hat(z, tau[i]) 
+                z = z - eta_k * F_hat(w, tau[i])
+            
+                z = 0.5 * (z + z_anch)
+
+        if (k+1) % skip == 0 :
+            USA2_grad_norm_trace[r, (k+1)//skip] = np.linalg.norm(Q@z - t) ** 2
+
+    ## SEG-US
+    z = np.copy(z0)
+    SEG_grad_norm_trace[r, 0] = np.linalg.norm(Q @ z0 - t)**2
 
     for k in tqdm(range(K), leave=False):
         for _ in range(2):
             tau = rng.choice(n, n, replace=True)
             eta_k = eta_0 / (1. + k / 10.0)**decay_exp 
-
-            for i in range(n): 
-                z1 = z - eta_k * TT11 @ F_hat(z, tau[i]) 
-                z1 = z1 - eta_k * TT12 @ F_hat(z1, tau[i])  
-                
-                z2 = z - eta_k * TT21 @ F_hat(z, tau[i]) 
-                z2 = z2 - eta_k * TT22 @ F_hat(z2, tau[i])   
-
-                z = 0.5 * (z1 + z2)
+            for i in range(n):
+                w = z - eta_k * F_hat(z, tau[i]) 
+                z = z - eta_k * F_hat(w, tau[i]) 
 
         if (k+1) % skip == 0 :
-            SlGDA2_grad_norm_trace[r, (k+1)//skip] = np.linalg.norm(Q@z - t) ** 2
+            SEG_grad_norm_trace[r, (k+1)//skip] = np.linalg.norm(Q@z - t) ** 2
+
         
 FFA_grad_norm_trace /= init_norm_sq
 FF_grad_norm_trace /= init_norm_sq
 RRA_grad_norm_trace /= init_norm_sq
 RRA2_grad_norm_trace /= init_norm_sq
 RR_grad_norm_trace /= init_norm_sq
-SlGDA_grad_norm_trace /= init_norm_sq
-SlGDA2_grad_norm_trace /= init_norm_sq 
+USA_grad_norm_trace /= init_norm_sq
+USA2_grad_norm_trace /= init_norm_sq
+SEG_grad_norm_trace /= init_norm_sq 
 
 FFA_mean = gmean(FFA_grad_norm_trace, axis=0)  
 FF_mean = gmean(FF_grad_norm_trace, axis=0)  
 RRA_mean = gmean(RRA_grad_norm_trace, axis=0)  
 RRA2_mean = gmean(RRA2_grad_norm_trace, axis=0)  
 RR_mean = gmean(RR_grad_norm_trace, axis=0)  
-SlGDA_mean = gmean(SlGDA_grad_norm_trace, axis=0)  
-SlGDA2_mean = gmean(SlGDA2_grad_norm_trace, axis=0)  
+USA_mean = gmean(USA_grad_norm_trace, axis=0)  
+USA2_mean = gmean(USA2_grad_norm_trace, axis=0)   
+SEG_mean = gmean(SEG_grad_norm_trace, axis=0)  
 
 xtikz = 2*skip * np.arange(0, rec+1)
 plt.semilogy(xtikz, FFA_mean, alpha=0.67)
 plt.semilogy(xtikz, FF_mean, alpha=0.67)
-plt.semilogy(xtikz, RR_mean, alpha=0.67) 
+plt.semilogy(xtikz, RR_mean, alpha=0.67)
+plt.semilogy(xtikz, SEG_mean, alpha=0.67)
 plt.semilogy(xtikz, RRA_mean, "--", alpha=0.9)
 plt.semilogy(xtikz, RRA2_mean, "--", alpha=0.9)
-plt.semilogy(xtikz, SlGDA_mean, "-.", alpha=0.9)
-plt.semilogy(xtikz, SlGDA2_mean, "-.", alpha=0.9)
+plt.semilogy(xtikz, USA_mean, "--", alpha=0.9)
+plt.semilogy(xtikz, USA2_mean, "--", alpha=0.9)
 
 dat = np.vstack((FFA_mean, FF_mean, RRA_mean, RRA2_mean, RR_mean,
-                 SlGDA_mean, SlGDA2_mean))
+                 USA_mean, USA2_mean, SEG_mean))
 np.save("CC-50000.npy", dat)
  
 plt.rcParams['text.usetex'] = True
@@ -249,9 +256,9 @@ plt.xticks(fontsize=15)
 plt.ylabel(r"$\dfrac{\|F z_0^t\|^2}{\|F z_0^0\|^2}$ or $\dfrac{\|F z_0^{t/2}\|^2}{\|F z_0^0\|^2}$", fontsize=15)
 plt.yticks(fontsize=15)
 plt.tight_layout()
-plt.legend(["SEG-FFA", "SEG-FF", "SEG-RR",
+plt.legend(["SEG-FFA", "SEG-FF", "SEG-RR", "SEG-US",
             r"SEG-RRA, $\alpha = \beta$", r"SEG-RRA, $\alpha = \beta/2$",
-            "Slingshot v1", "Slingshot v2$",],
+            r"SEG-USA, $\alpha = \beta$", r"SEG-USA, $\alpha = \beta/2$",],
            fontsize=15, ncol=2)
 
 
